@@ -18,7 +18,7 @@ Local clients call this Worker with a shared bearer token. The Worker validates 
 }
 ```
 
-`task` and `details` are optional. Git metadata is intentionally not part of the first version.
+All payload fields are optional. The Worker fills in defaults when fields are omitted. `task` and `details` are omitted from Telegram text when empty, and Git metadata is intentionally not part of the first version.
 
 ## Worker Secrets
 
@@ -29,6 +29,12 @@ wrangler secret put AI_NOTIFY_KEY
 wrangler secret put TELEGRAM_BOT_TOKEN
 wrangler secret put TELEGRAM_CHAT_ID
 ```
+
+## Failure Modes
+
+- Missing `AI_NOTIFY_KEY` returns `500 Worker misconfigured`
+- Malformed JSON or non-object JSON returns `400 Invalid JSON`
+- Invalid bearer token returns `401 Unauthorized`
 
 ## Development
 
