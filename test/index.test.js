@@ -182,3 +182,25 @@ test("telegram API failure returns 502", async () => {
     restoreFetch();
   }
 });
+
+test("telegram transport failure returns 502", async () => {
+  const restoreFetch = withFetch(async () => {
+    throw new Error("network unreachable");
+  });
+
+  try {
+    const response = await worker.fetch(
+      jsonRequest({ title: "hello" }),
+      env,
+      {}
+    );
+
+    assert.equal(response.status, 502);
+    assert.equal(
+      await response.text(),
+      "Telegram error: network unreachable"
+    );
+  } finally {
+    restoreFetch();
+  }
+});

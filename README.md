@@ -35,6 +35,7 @@ wrangler secret put TELEGRAM_CHAT_ID
 - Missing `AI_NOTIFY_KEY` returns `500 Worker misconfigured`
 - Malformed JSON or non-object JSON returns `400 Invalid JSON`
 - Invalid bearer token returns `401 Unauthorized`
+- Telegram API or transport failure returns `502 Telegram error: ...`
 
 ## Development
 

@@ -38,20 +38,25 @@ export default {
 
     const payload = normalizePayload(rawPayload);
     const text = formatTelegramText(payload);
-    const telegramResponse = await fetch(
-      `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          chat_id: env.TELEGRAM_CHAT_ID,
-          text,
-          disable_web_page_preview: true,
-        }),
-      }
-    );
+    let telegramResponse;
+    try {
+      telegramResponse = await fetch(
+        `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            chat_id: env.TELEGRAM_CHAT_ID,
+            text,
+            disable_web_page_preview: true,
+          }),
+        }
+      );
+    } catch (error) {
+      return new Response(`Telegram error: ${error.message}`, { status: 502 });
+    }
 
     if (!telegramResponse.ok) {
       const body = await telegramResponse.text();
