@@ -14,6 +14,10 @@ export default {
       return new Response("Method Not Allowed", { status: 405 });
     }
 
+    if (!env.AI_NOTIFY_KEY) {
+      return new Response("Worker misconfigured", { status: 500 });
+    }
+
     const auth = request.headers.get("authorization") || "";
     const expected = `Bearer ${env.AI_NOTIFY_KEY}`;
 
@@ -25,6 +29,10 @@ export default {
     try {
       rawPayload = await request.json();
     } catch {
+      return new Response("Invalid JSON", { status: 400 });
+    }
+
+    if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
       return new Response("Invalid JSON", { status: 400 });
     }
 

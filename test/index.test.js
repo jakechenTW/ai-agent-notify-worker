@@ -61,6 +61,27 @@ test("invalid JSON returns 400", async () => {
   assert.equal(await response.text(), "Invalid JSON");
 });
 
+test("null JSON body returns 400", async () => {
+  const response = await worker.fetch(jsonRequest(null), env, {});
+
+  assert.equal(response.status, 400);
+  assert.equal(await response.text(), "Invalid JSON");
+});
+
+test("missing worker key returns 500", async () => {
+  const response = await worker.fetch(
+    jsonRequest({ title: "hello" }, "undefined"),
+    {
+      TELEGRAM_BOT_TOKEN: "telegram-token",
+      TELEGRAM_CHAT_ID: "telegram-chat",
+    },
+    {}
+  );
+
+  assert.equal(response.status, 500);
+  assert.equal(await response.text(), "Worker misconfigured");
+});
+
 test("successful request forwards formatted Telegram text", async () => {
   let telegramUrl = "";
   let telegramBody = {};
