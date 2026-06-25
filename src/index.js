@@ -1,3 +1,6 @@
+import { bold, code, format, join } from "@gramio/format";
+import { markdownToFormattable } from "@gramio/format/markdown";
+
 const FIELD_LIMITS = {
   prefix: 64,
   tool: 64,
@@ -37,7 +40,7 @@ export default {
     }
 
     const payload = normalizePayload(rawPayload);
-    const text = formatTelegramText(payload);
+    const message = formatTelegramMessage(payload);
     let telegramResponse;
     try {
       telegramResponse = await fetch(
@@ -49,7 +52,8 @@ export default {
           },
           body: JSON.stringify({
             chat_id: env.TELEGRAM_CHAT_ID,
-            text,
+            text: message.text,
+            ...(message.entities?.length ? { entities: message.entities } : {}),
             disable_web_page_preview: true,
           }),
         }
@@ -82,19 +86,29 @@ function normalizePayload(payload) {
   };
 }
 
-function formatTelegramText(payload) {
-  const lines = [
-    `${statusIcon(payload.status)} ${payload.prefix}`,
-    `Tool: ${payload.tool}`,
-    `Host: ${payload.host}`,
-    payload.task ? `Task: ${payload.task}` : null,
-    "",
-    payload.title,
-    payload.details ? "" : null,
-    payload.details || null,
-  ];
+function formatTelegramMessage(payload) {
+  const metadata = formatTelegramMetadata(payload);
 
-  return lines.filter((line) => line !== null).join("\n");
+  if (!payload.details) {
+    return metadata;
+  }
+
+  return format`${metadata}\n\n${formatTelegramDetails(payload)}`;
+}
+
+function formatTelegramMetadata(payload) {
+  const statusLine = format`${statusIcon(payload.status)} ${bold(payload.prefix)} · ${code(payload.status)}`;
+  const metadataParts = [
+    payload.tool,
+    payload.host,
+    payload.task || null,
+  ].filter(Boolean);
+
+  return format`${statusLine}\n${join(metadataParts, " · ")}\n\n${bold(payload.title)}`;
+}
+
+function formatTelegramDetails(payload) {
+  return markdownToFormattable(payload.details);
 }
 
 function statusIcon(status) {

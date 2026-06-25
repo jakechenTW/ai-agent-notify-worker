@@ -82,7 +82,7 @@ test("missing worker key returns 500", async () => {
   assert.equal(await response.text(), "Worker misconfigured");
 });
 
-test("successful request forwards formatted Telegram text", async () => {
+test("successful request converts markdown details to Telegram entities", async () => {
   let telegramUrl = "";
   let telegramBody = {};
   const restoreFetch = withFetch(async (url, init) => {
@@ -100,7 +100,7 @@ test("successful request forwards formatted Telegram text", async () => {
         host: "jake-mac",
         task: "daily check",
         title: "All checks passed.",
-        details: "Checked 4 scheduled tasks.",
+        details: "**Checked 4 scheduled tasks.** [Open report](https://example.test/report)",
       }),
       env,
       {}
@@ -115,15 +115,41 @@ test("successful request forwards formatted Telegram text", async () => {
     assert.deepEqual(telegramBody, {
       chat_id: "telegram-chat",
       text: [
-        "✅ AI Agent",
-        "Tool: codex",
-        "Host: jake-mac",
-        "Task: daily check",
+        "✅ AI Agent · ok",
+        "codex · jake-mac · daily check",
         "",
         "All checks passed.",
         "",
-        "Checked 4 scheduled tasks.",
+        "Checked 4 scheduled tasks. Open report",
       ].join("\n"),
+      entities: [
+        {
+          type: "bold",
+          offset: 2,
+          length: 8,
+        },
+        {
+          type: "code",
+          offset: 13,
+          length: 2,
+        },
+        {
+          type: "bold",
+          offset: 48,
+          length: 18,
+        },
+        {
+          type: "bold",
+          offset: 68,
+          length: 26,
+        },
+        {
+          type: "text_link",
+          offset: 95,
+          length: 11,
+          url: "https://example.test/report",
+        },
+      ],
       disable_web_page_preview: true,
     });
   } finally {
@@ -149,16 +175,33 @@ test("empty task and details are omitted", async () => {
     );
 
     assert.equal(response.status, 200);
-    assert.equal(
-      telegramBody.text,
-      [
-        "ℹ️ AI Agent",
-        "Tool: manual",
-        "Host: unknown-host",
+    assert.deepEqual(telegramBody, {
+      chat_id: "telegram-chat",
+      text: [
+        "ℹ️ AI Agent · info",
+        "manual · unknown-host",
         "",
         "Scheduled task finished.",
-      ].join("\n")
-    );
+      ].join("\n"),
+      entities: [
+        {
+          type: "bold",
+          offset: 3,
+          length: 8,
+        },
+        {
+          type: "code",
+          offset: 14,
+          length: 4,
+        },
+        {
+          type: "bold",
+          offset: 42,
+          length: 24,
+        },
+      ],
+      disable_web_page_preview: true,
+    });
   } finally {
     restoreFetch();
   }
