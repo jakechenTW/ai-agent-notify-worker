@@ -71,10 +71,8 @@ curl -sS -X POST "https://your-worker.workers.dev" \
 Expected Telegram text:
 
 ```text
-✅ AI Agent
-Tool: manual
-Host: test-host
-Task: manual relay test
+✅ AI Agent · ok
+manual · test-host · manual relay test
 
 Worker relay is ready.
 
