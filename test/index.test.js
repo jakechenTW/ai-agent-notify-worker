@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import worker from "../src/index.js";
+import worker, { splitMessage } from "../src/index.js";
 
 const env = {
   AI_NOTIFY_KEY: "test-key",
@@ -246,4 +246,67 @@ test("telegram transport failure returns 502", async () => {
   } finally {
     restoreFetch();
   }
+});
+
+test("splitMessage returns a single chunk without a marker for short text", () => {
+  const text = "short message";
+  const entities = [{ type: "bold", offset: 0, length: 5 }];
+  const chunks = splitMessage(text, entities);
+
+  assert.equal(chunks.length, 1);
+  assert.equal(chunks[0].text, text);
+  assert.deepEqual(chunks[0].entities, entities);
+});
+
+test("splitMessage splits long text into capped chunks within the Telegram limit", () => {
+  const text = "a".repeat(9000); // no newlines -> hard cuts at the budget edge
+  const chunks = splitMessage(text, []);
+
+  assert.equal(chunks.length, 3);
+  for (let i = 0; i < chunks.length; i += 1) {
+    assert.ok(chunks[i].text.length <= 4096);
+    assert.match(chunks[i].text, new RegExp(`^\\(${i + 1}/3\\)\\n`));
+  }
+  const reconstructed = chunks
+    .map((chunk) => chunk.text.replace(/^\(\d\/\d\)\n/, ""))
+    .join("");
+  assert.equal(reconstructed, text);
+});
+
+test("splitMessage prefers a newline boundary when one is in range", () => {
+  const text = "a".repeat(4000) + "\n" + "b".repeat(4000);
+  const chunks = splitMessage(text, []);
+
+  assert.equal(chunks.length, 2);
+  assert.equal(chunks[0].text, "(1/2)\n" + "a".repeat(4000));
+  assert.equal(chunks[1].text, "(2/2)\n" + "b".repeat(4000));
+});
+
+test("splitMessage clips an entity spanning a hard cut into both chunks", () => {
+  const text = "a".repeat(9000);
+  const entities = [{ type: "bold", offset: 4080, length: 16 }]; // [4080,4096) spans the cut at 4088
+  const chunks = splitMessage(text, entities);
+
+  assert.deepEqual(chunks[0].entities, [{ type: "bold", offset: 4086, length: 8 }]);
+  assert.deepEqual(chunks[1].entities, [{ type: "bold", offset: 6, length: 8 }]);
+  assert.deepEqual(chunks[2].entities, []);
+});
+
+test("splitMessage shifts entity offsets by the marker length", () => {
+  const text = "a".repeat(9000);
+  const entities = [{ type: "bold", offset: 10, length: 5 }];
+  const chunks = splitMessage(text, entities);
+
+  assert.deepEqual(chunks[0].entities[0], { type: "bold", offset: 16, length: 5 });
+});
+
+test("splitMessage drops content beyond MAX_MESSAGES", () => {
+  const text = "a".repeat(20000); // would need 5 hard-cut chunks, capped at 4
+  const chunks = splitMessage(text, []);
+
+  assert.equal(chunks.length, 4);
+  const delivered = chunks
+    .map((chunk) => chunk.text.replace(/^\(\d\/\d\)\n/, "").length)
+    .reduce((sum, length) => sum + length, 0);
+  assert.equal(delivered, 4 * 4088); // 16352 chars delivered; the rest is dropped
 });

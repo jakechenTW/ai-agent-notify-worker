@@ -11,6 +11,11 @@ const FIELD_LIMITS = {
   details: 2000,
 };
 
+const TELEGRAM_LIMIT = 4096;
+const MAX_MESSAGES = 4;
+const PREFIX_RESERVE = 8;
+const CONTENT_BUDGET = TELEGRAM_LIMIT - PREFIX_RESERVE;
+
 export default {
   async fetch(request, env) {
     if (request.method !== "POST") {
@@ -109,6 +114,72 @@ function formatTelegramMetadata(payload) {
 
 function formatTelegramDetails(payload) {
   return markdownToFormattable(payload.details);
+}
+
+export function splitMessage(text, entities = []) {
+  if (text.length <= TELEGRAM_LIMIT) {
+    return [{ text, entities }];
+  }
+
+  const ranges = [];
+  let start = 0;
+  while (start < text.length && ranges.length < MAX_MESSAGES) {
+    const { end, nextStart } = nextRange(text, start);
+    ranges.push([start, end]);
+    start = nextStart;
+  }
+
+  const total = ranges.length;
+  return ranges.map(([rangeStart, rangeEnd], index) => {
+    const prefix = `(${index + 1}/${total})\n`;
+    const chunkEntities = rebaseEntities(entities, rangeStart, rangeEnd).map(
+      (entity) => ({ ...entity, offset: entity.offset + prefix.length })
+    );
+    return {
+      text: prefix + text.slice(rangeStart, rangeEnd),
+      entities: chunkEntities,
+    };
+  });
+}
+
+function nextRange(text, start) {
+  const hardEnd = Math.min(start + CONTENT_BUDGET, text.length);
+  if (hardEnd >= text.length) {
+    return { end: text.length, nextStart: text.length };
+  }
+
+  const newlineIndex = text.lastIndexOf("\n", hardEnd - 1);
+  if (newlineIndex > start) {
+    return { end: newlineIndex, nextStart: newlineIndex + 1 };
+  }
+
+  const cut = avoidSurrogateSplit(text, hardEnd);
+  return { end: cut, nextStart: cut };
+}
+
+function avoidSurrogateSplit(text, cut) {
+  const previous = text.charCodeAt(cut - 1);
+  if (previous >= 0xd800 && previous <= 0xdbff) {
+    return cut - 1;
+  }
+  return cut;
+}
+
+function rebaseEntities(entities, start, end) {
+  const rebased = [];
+  for (const entity of entities) {
+    const clippedStart = Math.max(entity.offset, start);
+    const clippedEnd = Math.min(entity.offset + entity.length, end);
+    if (clippedEnd <= clippedStart) {
+      continue;
+    }
+    rebased.push({
+      ...entity,
+      offset: clippedStart - start,
+      length: clippedEnd - clippedStart,
+    });
+  }
+  return rebased;
 }
 
 function statusIcon(status) {
