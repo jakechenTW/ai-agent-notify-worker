@@ -203,7 +203,6 @@ Create `.claude/settings.json` with exactly this content (side-effect commands l
     "allow": [
       "Bash(npm test)",
       "Bash(npm install)",
-      "Bash(npx wrangler:*)",
       "Bash(git status)",
       "Bash(git diff:*)",
       "Bash(git log:*)"

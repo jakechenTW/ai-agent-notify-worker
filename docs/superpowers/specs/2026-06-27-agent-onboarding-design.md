@@ -65,7 +65,6 @@ deliberately excluded so a human confirms anything with side effects.
     "allow": [
       "Bash(npm test)",
       "Bash(npm install)",
-      "Bash(npx wrangler:*)",
       "Bash(git status)",
       "Bash(git diff:*)",
       "Bash(git log:*)"
