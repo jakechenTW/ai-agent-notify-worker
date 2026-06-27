@@ -4,6 +4,8 @@ Cloudflare Worker relay for AI agent scheduled task notifications.
 
 Local clients call this Worker with a shared bearer token. The Worker validates the token, formats a short Telegram message, and forwards it through the Telegram Bot API.
 
+> **AI agents:** see [`AGENTS.md`](AGENTS.md) for the agent guide (architecture, conventions, ops).
+
 ## Payload
 
 ```json
