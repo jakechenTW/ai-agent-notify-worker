@@ -8,7 +8,7 @@ const FIELD_LIMITS = {
   host: 128,
   task: 128,
   title: 300,
-  details: 2000,
+  details: 15000,
 };
 
 const TELEGRAM_LIMIT = 4096;
@@ -46,30 +46,34 @@ export default {
 
     const payload = normalizePayload(rawPayload);
     const message = formatTelegramMessage(payload);
-    let telegramResponse;
-    try {
-      telegramResponse = await fetch(
-        `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,
-        {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            chat_id: env.TELEGRAM_CHAT_ID,
-            text: message.text,
-            ...(message.entities?.length ? { entities: message.entities } : {}),
-            disable_web_page_preview: true,
-          }),
-        }
-      );
-    } catch (error) {
-      return new Response(`Telegram error: ${error.message}`, { status: 502 });
-    }
+    const chunks = splitMessage(message.text, message.entities);
 
-    if (!telegramResponse.ok) {
-      const body = await telegramResponse.text();
-      return new Response(`Telegram error: ${body}`, { status: 502 });
+    for (const chunk of chunks) {
+      let telegramResponse;
+      try {
+        telegramResponse = await fetch(
+          `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({
+              chat_id: env.TELEGRAM_CHAT_ID,
+              text: chunk.text,
+              ...(chunk.entities?.length ? { entities: chunk.entities } : {}),
+              disable_web_page_preview: true,
+            }),
+          }
+        );
+      } catch (error) {
+        return new Response(`Telegram error: ${error.message}`, { status: 502 });
+      }
+
+      if (!telegramResponse.ok) {
+        const body = await telegramResponse.text();
+        return new Response(`Telegram error: ${body}`, { status: 502 });
+      }
     }
 
     return new Response("ok", { status: 200 });

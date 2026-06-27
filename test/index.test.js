@@ -340,3 +340,56 @@ test("splitMessage never emits an empty chunk when a newline sits at a chunk sta
     assert.ok(content.length > 0, "empty chunk emitted");
   }
 });
+
+test("long details are sent as multiple Telegram messages within the limit", async () => {
+  const calls = [];
+  const restoreFetch = withFetch(async (_url, init) => {
+    calls.push(JSON.parse(init.body));
+    return new Response("{}", { status: 200 });
+  });
+
+  try {
+    const response = await worker.fetch(
+      jsonRequest({ title: "Big report", details: "a".repeat(13000) }),
+      env,
+      {}
+    );
+
+    assert.equal(response.status, 200);
+    assert.equal(await response.text(), "ok");
+    assert.ok(calls.length > 1);
+    for (const body of calls) {
+      assert.ok(body.text.length <= 4096);
+      assert.match(body.text, /^\(\d\/\d\)\n/);
+      assert.equal(body.chat_id, "telegram-chat");
+      assert.equal(body.disable_web_page_preview, true);
+    }
+  } finally {
+    restoreFetch();
+  }
+});
+
+test("a failed chunk stops sending and returns 502", async () => {
+  let callCount = 0;
+  const restoreFetch = withFetch(async () => {
+    callCount += 1;
+    if (callCount === 2) {
+      return new Response("rate limited", { status: 429 });
+    }
+    return new Response("{}", { status: 200 });
+  });
+
+  try {
+    const response = await worker.fetch(
+      jsonRequest({ title: "Big report", details: "a".repeat(13000) }),
+      env,
+      {}
+    );
+
+    assert.equal(response.status, 502);
+    assert.equal(await response.text(), "Telegram error: rate limited");
+    assert.equal(callCount, 2);
+  } finally {
+    restoreFetch();
+  }
+});
