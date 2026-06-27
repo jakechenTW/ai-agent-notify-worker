@@ -310,3 +310,33 @@ test("splitMessage drops content beyond MAX_MESSAGES", () => {
     .reduce((sum, length) => sum + length, 0);
   assert.equal(delivered, 4 * 4088); // 16352 chars delivered; the rest is dropped
 });
+
+test("splitMessage keeps text at the limit as one chunk and splits one over", () => {
+  assert.equal(splitMessage("a".repeat(4096), []).length, 1);
+  assert.equal(splitMessage("a".repeat(4097), []).length, 2);
+});
+
+test("splitMessage never splits a UTF-16 surrogate pair on a hard cut", () => {
+  const text = "🎉".repeat(3000); // 6000 UTF-16 code units, no newline -> hard cut
+  const chunks = splitMessage(text, []);
+  assert.ok(chunks.length > 1);
+  for (const chunk of chunks) {
+    const content = chunk.text.replace(/^\(\d\/\d\)\n/, "");
+    const first = content.charCodeAt(0);
+    const last = content.charCodeAt(content.length - 1);
+    // no lone low surrogate at the start, no lone high surrogate at the end
+    assert.ok(!(first >= 0xdc00 && first <= 0xdfff), "chunk starts mid-pair");
+    assert.ok(!(last >= 0xd800 && last <= 0xdbff), "chunk ends mid-pair");
+  }
+});
+
+test("splitMessage never emits an empty chunk when a newline sits at a chunk start", () => {
+  // first hard cut at 4088 (no newline in [0,4088)); next chunk starts at 4088,
+  // and index 4088 is a newline -> must NOT cut at start (would be empty).
+  const text = "a".repeat(4088) + "\n" + "b".repeat(4088);
+  const chunks = splitMessage(text, []);
+  for (const chunk of chunks) {
+    const content = chunk.text.replace(/^\(\d\/\d\)\n/, "");
+    assert.ok(content.length > 0, "empty chunk emitted");
+  }
+});
